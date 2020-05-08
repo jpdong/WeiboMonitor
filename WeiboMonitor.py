@@ -8,6 +8,7 @@ Author:
 '''
 import re
 import time
+import itchat
 from DecryptLogin import login
 from playsound import playsound
 
@@ -78,6 +79,9 @@ class wbMonitor():
 					pics = '||'.join(pics)
 					print('[时间]: %s\n[来源]: %s\n[原文作者]: %s\n[内容]: %s\n[图片链接]： %s\n' % 
 						  (card['mblog']['created_at'], card['mblog']['source'], card['mblog']['user']['screen_name'], card['mblog']['text'], pics))
+					chartRoom = itchat.search_chatrooms(name="wu2198")[0]
+					chartRoom.send('[时间]: %s\n[来源]: %s\n[原文作者]: %s\n[内容]: %s\n[图片链接]： %s\n' %
+						  (card['mblog']['created_at'], card['mblog']['source'], card['mblog']['user']['screen_name'], card['mblog']['text'], pics))
 					playsound("sound.mp3")
 		if not flag:
 			print(str(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))) + ': 用户<%s>未发布新微博' % user_name)
@@ -123,4 +127,5 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 	if args.username and args.password:
 		wb = wbMonitor(username=args.username, password=args.password, time_interval=args.time_interval)
+		itchat.auto_login()
 		wb.start(args.id)
