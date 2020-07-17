@@ -1,11 +1,3 @@
-'''
-Function:
-	微博监控
-Author:
-	Charles
-微信公众号:
-	Charles的皮卡丘
-'''
 import re
 import time
 
@@ -39,7 +31,7 @@ class wbMonitor():
 
     def start(self, user_id=None):
         if not user_id:
-            followed = self.__getFollowed()
+            followed = self.getFollowed()
             print('未指定想要监控的用户ID, 您关注的用户有:\n(是否想选择其中一位进行监控?)')
             print('-' * 40)
             for idx, each in enumerate(sorted(followed.keys())):
@@ -55,12 +47,12 @@ class wbMonitor():
                     print('您的输入有误, 请重新输入.')
         else:
             profile_url = self.format_profile_url.format(user_id, user_id)
-        self.__monitor(user_id, profile_url)
+        self.monitor(user_id, profile_url)
 
     '''监控用户主页'''
 
-    def __monitor(self, user_id, profile_url):
-        user_name, containerid = self.__getContainerid(user_id, profile_url)
+    def monitor(self, user_id, profile_url):
+        user_name, containerid = self.getContainerid(user_id, profile_url)
         res = self.session.get(self.api_url.format(user_id, user_id, containerid))
         weibo_ids = []
         cards = res.json()['data']['cards']
@@ -68,7 +60,7 @@ class wbMonitor():
             if card['card_type'] == 9:
                 weibo_ids.append(str(card['mblog']['id']))
         while True:
-            result = self.__checkUpdate(user_id, profile_url, weibo_ids)
+            result = self.checkUpdate(user_id, profile_url, weibo_ids)
             if len(result) == 0:
                 print("empty update array\n")
                 time.sleep(60)
@@ -78,51 +70,56 @@ class wbMonitor():
 
     '''检查用户是否有新的微博'''
 
-    def __checkUpdate(self, user_id, profile_url, weibo_ids):
-        user_name, containerid = self.__getContainerid(user_id, profile_url)
-        if containerid == -1:
-            return []
-        res = self.session.get(self.api_url.format(user_id, user_id, containerid))
-        resJson = res.json();
-        if "data" in resJson:
-            data = res.json()['data']
-            if "cards" in data:
-                cards = res.json()['data']['cards']
-                flag = False
-                for card in cards:
-                    if card['card_type'] == 9:
-                        if str(card['mblog']['id']) not in weibo_ids:
-                            flag = True
-                            weibo_ids.append(str(card['mblog']['id']))
-                            print(str(time.strftime('%Y-%m-%d %H:%M:%S',
-                                                    time.localtime(time.time()))) + ': 用户<%s>发布了新微博' % user_name)
-                            pics = []
-                            if card['mblog'].get('pics'):
-                                for i in card['mblog']['pics']:
-                                    pics.append(i['url'])
-                            pics = '||'.join(pics)
-                            message = ('[时间]: %s\n[来源]: %s\n[原文作者]: %s\n[内容]: %s\n[图片链接]： %s\n' %
-                                  (card['mblog']['created_at'], card['mblog']['source'],
-                                   card['mblog']['user']['screen_name'], card['mblog']['text'], pics))
-                            self.handler.handleMessage(message)
+    def checkUpdate(self, user_id, profile_url, weibo_ids):
+        try:
+            user_name, containerid = self.getContainerid(user_id, profile_url)
+            if containerid == -1:
+                return []
+            res = self.session.get(self.api_url.format(user_id, user_id, containerid))
+            resJson = res.json();
+            if "data" in resJson:
+                data = res.json()['data']
+                if "cards" in data:
+                    cards = res.json()['data']['cards']
+                    flag = False
+                    for card in cards:
+                        if card['card_type'] == 9:
+                            if str(card['mblog']['id']) not in weibo_ids:
+                                flag = True
+                                weibo_ids.append(str(card['mblog']['id']))
+                                print(str(time.strftime('%Y-%m-%d %H:%M:%S',
+                                                        time.localtime(time.time()))) + ': 用户<%s>发布了新微博' % user_name)
+                                pics = []
+                                if card['mblog'].get('pics'):
+                                    for i in card['mblog']['pics']:
+                                        pics.append(i['url'])
+                                pics = '||'.join(pics)
+                                message = ('[时间]: %s\n[来源]: %s\n[原文作者]: %s\n[内容]: %s\n[图片链接]： %s\n' %
+                                      (card['mblog']['created_at'], card['mblog']['source'],
+                                       card['mblog']['user']['screen_name'], card['mblog']['text'], pics))
+                                self.handler.handleMessage(message)
+                else:
+                    print("not contains cards\n")
+                    print(res.text + "\n")
             else:
-                print("not contains cards\n")
+                print("not contains data\n")
                 print(res.text + "\n")
-        else:
-            print("not contains data\n")
-            print(res.text + "\n")
+                return []
+            if not flag:
+                print(str(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))) + ': 用户<%s>未发布新微博' % user_name)
+            return weibo_ids
+        except Exception as e:
+            print(e)
+            print("异常")
             return []
-        if not flag:
-            print(str(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))) + ': 用户<%s>未发布新微博' % user_name)
-        return weibo_ids
 
     '''获取containerid'''
 
-    def __getContainerid(self, user_id, profile_url):
+    def getContainerid(self, user_id, profile_url):
         self.session.get(profile_url)
         containerid = re.findall(r'fid%3D(\d+)%26', str(self.session.cookies))[0]
         res = self.session.get(self.api_url.format(user_id, user_id, containerid))
-        user_name = self.__decode(re.findall(r'"screen_name":"(.*?)"', res.text)[0])
+        user_name = self.decode(re.findall(r'"screen_name":"(.*?)"', res.text)[0])
         # print("res:" + res.text)
         data = res.json()['data']
         if "tabsInfo" in data:
@@ -137,7 +134,7 @@ class wbMonitor():
 
     '''获取关注列表'''
 
-    def __getFollowed(self):
+    def getFollowed(self):
         data = {}
         page = 0
         while True:
@@ -150,12 +147,12 @@ class wbMonitor():
             if len(profile_urls) == 0:
                 break
             for screen_name, profile_url in zip(screen_names, profile_urls):
-                data[self.__decode(screen_name)] = profile_url.replace('\\', '')
+                data[self.decode(screen_name)] = profile_url.replace('\\', '')
         return data
 
     '''解码'''
 
-    def __decode(self, content):
+    def decode(self, content):
         return content.encode('latin-1').decode('unicode_escape')
 
 class WeChatHandler(MessageHandler):
